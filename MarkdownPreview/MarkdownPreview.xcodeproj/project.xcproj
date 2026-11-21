@@ -32,7 +32,6 @@
           "target": "MarkdownQuickLook",
           "exclusions": [
             "Info.plist",
-            "MarkdownQuickLook.entitlements",
           ],
         },
       ],

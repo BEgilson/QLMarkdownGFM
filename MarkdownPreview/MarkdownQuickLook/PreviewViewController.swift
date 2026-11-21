@@ -21,6 +21,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
         // Markdown files can contain raw HTML. Never run scripts that come from the file.
         configuration.defaultWebpagePreferences.allowsContentJavaScript = false
 
+        // Our own bundled script still runs: WebKit allows app-injected scripts even
+        // with page JavaScript off. It runs in a separate "world", so the page can't
+        // see or tamper with it.
+        if let highlighter = Self.syntaxHighlightingScript {
+            configuration.userContentController.addUserScript(highlighter)
+        }
+
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
         self.webView = webView
@@ -72,10 +79,52 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
     ) {
         if navigationAction.navigationType == .linkActivated,
            let url = navigationAction.request.url {
-            NSWorkspace.shared.open(url)
+            openLinkThroughHelper(url)
             decisionHandler(.cancel)
         } else {
             decisionHandler(.allow)
+        }
+    }
+
+    /// highlight.js (bundled, BSD-3-Clause) plus a call that colours every code block
+    /// that names its language, e.g. ```swift. Like GitHub, unlabelled blocks stay plain.
+    private static let syntaxHighlightingScript: WKUserScript? = {
+        guard
+            let url = Bundle.main.url(forResource: "highlight.min", withExtension: "js"),
+            let library = try? String(contentsOf: url, encoding: .utf8)
+        else {
+            return nil
+        }
+
+        let source = library + """
+
+        hljs.configure({ cssSelector: 'pre code[class*="language-"]', ignoreUnescapedHTML: true });
+        hljs.highlightAll();
+        """
+
+        return WKUserScript(
+            source: source,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true,
+            in: .defaultClient
+        )
+    }()
+
+    /// Quick Look's sandbox blocks extensions from opening URLs (`deny lsopen`),
+    /// so the ImageFetcher helper opens them instead.
+    private func openLinkThroughHelper(_ url: URL) {
+        let connection = NSXPCConnection(serviceName: ImageEmbedder.helperServiceName)
+        connection.remoteObjectInterface = NSXPCInterface(with: ImageFetcherProtocol.self)
+        connection.resume()
+
+        let helper = connection.remoteObjectProxyWithErrorHandler { error in
+            NSLog("MarkdownQuickLook: couldn't open link: %@", String(describing: error))
+        } as? ImageFetcherProtocol
+        helper?.openLink(url.absoluteString)
+
+        // openLink has no reply, so give the message a moment to be delivered.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            connection.invalidate()
         }
     }
 

@@ -12,7 +12,7 @@ import Foundation
 import UniformTypeIdentifiers
 
 enum ImageEmbedder {
-    private static let helperServiceName = "Frontal.MarkdownPreview.MarkdownQuickLook.ImageFetcher"
+    static let helperServiceName = "Frontal.MarkdownPreview.MarkdownQuickLook.ImageFetcher"
 
     /// Give up on remote images after this long, so an offline Mac doesn't hang the preview.
     private static let remoteTimeout: TimeInterval = 12

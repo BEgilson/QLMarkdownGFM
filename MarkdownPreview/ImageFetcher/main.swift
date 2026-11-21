@@ -7,7 +7,7 @@
 //  its own sandbox with the outgoing-connections entitlement.
 //
 
-import Foundation
+import AppKit
 
 final class ImageFetcher: NSObject, ImageFetcherProtocol {
     /// Largest image we'll download, so a huge file can't stall the preview.
@@ -56,6 +56,20 @@ final class ImageFetcher: NSObject, ImageFetcherProtocol {
         group.notify(queue: .global()) {
             reply(results)
         }
+    }
+
+    /// Only web and email links. A file: link could point at an app or a script,
+    /// and clicking a link in a preview should never launch one.
+    private static let openableSchemes: Set<String> = ["http", "https", "mailto"]
+
+    func openLink(_ urlString: String) {
+        guard
+            let url = URL(string: urlString),
+            let scheme = url.scheme?.lowercased(),
+            Self.openableSchemes.contains(scheme)
+        else { return }
+
+        NSWorkspace.shared.open(url)
     }
 }
 
