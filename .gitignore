@@ -1,6 +1,5 @@
 build/
-cmark/bin
-cmark/share
-cmark/lib/*
+DerivedData/
 
-!cmark/lib/*.a
+.DS_Store
+xcuserdata/

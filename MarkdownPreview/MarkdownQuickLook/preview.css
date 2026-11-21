@@ -1,0 +1,226 @@
+/* Preview stylesheet: GitHub-like look, follows the system light/dark setting. */
+
+:root {
+    --fg: #1f2328;
+    --fg-muted: #59636e;
+    --bg: #ffffff;
+    --bg-subtle: #f6f8fa;
+    --border: #d1d9e0;
+    --border-muted: #d1d9e0b3;
+    --link: #0969da;
+    --code-bg: #818b981f;
+
+    /* Syntax highlighting (highlight.js token classes) */
+    --hl-keyword: #cf222e;
+    --hl-string: #0a3069;
+    --hl-comment: #59636e;
+    --hl-number: #0550ae;
+    --hl-function: #8250df;
+    --hl-type: #953800;
+    --hl-tag: #116329;
+    --hl-addition-fg: #116329;
+    --hl-addition-bg: #dafbe1;
+    --hl-deletion-fg: #82071e;
+    --hl-deletion-bg: #ffebe9;
+
+    /* GitHub alerts */
+    --alert-note: #0969da;
+    --alert-tip: #1a7f37;
+    --alert-important: #8250df;
+    --alert-warning: #9a6700;
+    --alert-caution: #d1242f;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --fg: #f0f6fc;
+        --fg-muted: #9198a1;
+        --bg: #0d1117;
+        --bg-subtle: #151b23;
+        --border: #3d444d;
+        --border-muted: #3d444db3;
+        --link: #4493f8;
+        --code-bg: #656c7633;
+
+        --hl-keyword: #ff7b72;
+        --hl-string: #a5d6ff;
+        --hl-comment: #9198a1;
+        --hl-number: #79c0ff;
+        --hl-function: #d2a8ff;
+        --hl-type: #ffa657;
+        --hl-tag: #7ee787;
+        --hl-addition-fg: #aff5b4;
+        --hl-addition-bg: #033a16;
+        --hl-deletion-fg: #ffdcd7;
+        --hl-deletion-bg: #67060c;
+
+        --alert-note: #4493f8;
+        --alert-tip: #3fb950;
+        --alert-important: #ab7df8;
+        --alert-warning: #d29922;
+        --alert-caution: #f85149;
+    }
+}
+
+html {
+    background: var(--bg);
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+.markdown-body {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 32px;
+    word-wrap: break-word;
+}
+
+.markdown-body > *:first-child { margin-top: 0; }
+.markdown-body > *:last-child { margin-bottom: 0; }
+
+p, blockquote, ul, ol, table, pre {
+    margin: 0 0 16px;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    margin: 24px 0 16px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border-muted); }
+h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border-muted); }
+h3 { font-size: 1.25em; }
+h4 { font-size: 1em; }
+h5 { font-size: 0.875em; }
+h6 { font-size: 0.85em; color: var(--fg-muted); }
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Lists */
+ul, ol { padding-left: 2em; }
+li + li { margin-top: 0.25em; }
+li > ul, li > ol { margin: 0.25em 0 0; }
+li > p { margin: 0 0 8px; }
+
+/* Task lists: swift-markdown emits <li><input type="checkbox"> */
+li:has(> input[type="checkbox"]) { list-style: none; }
+li > input[type="checkbox"] { margin: 0 0.4em 0.2em -1.4em; vertical-align: middle; }
+
+/* Block quotes */
+blockquote {
+    padding: 0 1em;
+    color: var(--fg-muted);
+    border-left: 0.25em solid var(--border);
+}
+blockquote > :last-child { margin-bottom: 0; }
+
+/* GitHub alerts: > [!NOTE], [!TIP], [!IMPORTANT], [!WARNING], [!CAUTION] */
+.markdown-alert {
+    --alert-color: var(--alert-note);
+    padding: 8px 16px;
+    color: inherit;
+    border-left-color: var(--alert-color);
+}
+.markdown-alert-note { --alert-color: var(--alert-note); }
+.markdown-alert-tip { --alert-color: var(--alert-tip); }
+.markdown-alert-important { --alert-color: var(--alert-important); }
+.markdown-alert-warning { --alert-color: var(--alert-warning); }
+.markdown-alert-caution { --alert-color: var(--alert-caution); }
+
+.markdown-alert-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-weight: 600;
+    color: var(--alert-color);
+}
+/* A small filled circle as a simple, theme-aware icon. */
+.markdown-alert-title::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--alert-color);
+}
+
+/* Code */
+code {
+    font: 85%/1.45 ui-monospace, "SF Mono", Menlo, monospace;
+    padding: 0.2em 0.4em;
+    background: var(--code-bg);
+    border-radius: 6px;
+}
+pre {
+    padding: 16px;
+    overflow: auto;
+    background: var(--bg-subtle);
+    border-radius: 6px;
+}
+pre code {
+    padding: 0;
+    background: transparent;
+    font-size: 85%;
+    white-space: pre;
+}
+
+/* Syntax highlighting */
+.hljs-keyword, .hljs-doctag, .hljs-meta .hljs-keyword,
+.hljs-template-tag, .hljs-template-variable, .hljs-type.hljs-keyword,
+.hljs-variable.language_ { color: var(--hl-keyword); }
+
+.hljs-string, .hljs-regexp, .hljs-meta .hljs-string { color: var(--hl-string); }
+
+.hljs-comment, .hljs-code, .hljs-formula { color: var(--hl-comment); font-style: italic; }
+
+.hljs-number, .hljs-literal, .hljs-attr, .hljs-attribute, .hljs-variable,
+.hljs-selector-attr, .hljs-selector-class, .hljs-selector-id,
+.hljs-operator, .hljs-meta, .hljs-built_in { color: var(--hl-number); }
+
+.hljs-title, .hljs-title.function_, .hljs-title.class_.inherited__,
+.hljs-section { color: var(--hl-function); }
+
+.hljs-type, .hljs-title.class_, .hljs-params, .hljs-symbol,
+.hljs-bullet, .hljs-link { color: var(--hl-type); }
+
+.hljs-tag, .hljs-name, .hljs-selector-tag, .hljs-selector-pseudo,
+.hljs-quote { color: var(--hl-tag); }
+
+.hljs-addition { color: var(--hl-addition-fg); background: var(--hl-addition-bg); }
+.hljs-deletion { color: var(--hl-deletion-fg); background: var(--hl-deletion-bg); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+
+/* Tables */
+table {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow: auto;
+    border-collapse: collapse;
+}
+th, td {
+    padding: 6px 13px;
+    border: 1px solid var(--border);
+}
+th { font-weight: 600; }
+tr:nth-child(2n) { background: var(--bg-subtle); }
+
+hr {
+    height: 0.25em;
+    margin: 24px 0;
+    padding: 0;
+    border: 0;
+    background: var(--border);
+}
+
+img { max-width: 100%; }
+del { color: var(--fg-muted); }

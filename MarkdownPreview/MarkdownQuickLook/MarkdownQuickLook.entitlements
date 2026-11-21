@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	Quick Look only lets the extension read the file being previewed.
+	Images next to it (e.g. images/screenshot.png) need this read-only exception.
+	The other sandbox entitlements come from the target's build settings.
+	-->
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
+	<array>
+		<string>/</string>
+	</array>
+</dict>
+</plist>
