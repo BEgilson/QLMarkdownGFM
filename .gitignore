@@ -4,3 +4,6 @@ cmark/share
 cmark/lib/*
 
 !cmark/lib/*.a
+
+.DS_Store
+xcuserdata/
