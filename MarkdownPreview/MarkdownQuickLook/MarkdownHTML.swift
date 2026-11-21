@@ -19,7 +19,7 @@ enum MarkdownHTML {
         var escaper = HTMLTextEscaper()
         let escaped = escaper.visit(document) ?? document
 
-        let body = GitHubAlerts.apply(to: HTMLFormatter.format(escaped))
+        let body = HeadingAnchors.apply(to: GitHubAlerts.apply(to: HTMLFormatter.format(escaped)))
 
         return """
         <!doctype html>
@@ -87,6 +87,15 @@ private struct HTMLTextEscaper: MarkupRewriter {
             ? MarkdownHTML.escape(text.string)
             : Autolinker.linkify(text.string)
         return Markdown.Text(html)
+    }
+
+    /// HTMLFormatter writes headings as plain text, which loses **bold**, `code` and
+    /// links. So format the heading's contents here and hand it one Text node holding
+    /// that HTML, which HTMLFormatter then writes out unchanged.
+    mutating func visitHeading(_ heading: Heading) -> Markup? {
+        guard let rewritten = defaultVisit(heading) as? Heading else { return heading }
+        let innerHTML = rewritten.children.map { HTMLFormatter.format($0) }.joined()
+        return Heading(level: heading.level, [Markdown.Text(innerHTML)])
     }
 
     mutating func visitInlineCode(_ inlineCode: InlineCode) -> Markup? {
@@ -183,5 +192,53 @@ private enum GitHubAlerts {
             result.replaceCharacters(in: match.range, with: replacement)
         }
         return result as String
+    }
+}
+
+/// Gives every heading a GitHub-style id, so links like [Setup](#setup) can jump to it.
+/// "Getting Started!" becomes "getting-started"; repeats become "-1", "-2", and so on.
+private enum HeadingAnchors {
+    private static let headingPattern = try! NSRegularExpression(
+        pattern: #"<h([1-6])>(.*?)</h\1>"#,
+        options: [.dotMatchesLineSeparators]
+    )
+    private static let tagPattern = try! NSRegularExpression(pattern: #"<[^>]+>"#)
+
+    static func apply(to html: String) -> String {
+        let result = NSMutableString(string: html)
+        let matches = headingPattern.matches(in: html, range: NSRange(location: 0, length: result.length))
+
+        // Ids must be numbered in document order, so work them out first.
+        var used: [String: Int] = [:]
+        let ids: [String] = matches.map { match in
+            let base = slug(fromHTML: result.substring(with: match.range(at: 2)))
+            let count = used[base, default: 0]
+            used[base] = count + 1
+            return count == 0 ? base : "\(base)-\(count)"
+        }
+
+        // Then insert them from the end, so earlier ranges stay valid.
+        for (match, id) in zip(matches, ids).reversed() {
+            let level = result.substring(with: match.range(at: 1))
+            let openingTag = NSRange(location: match.range.location, length: "<hN>".count)
+            result.replaceCharacters(in: openingTag, with: "<h\(level) id=\"\(MarkdownHTML.escape(id))\">")
+        }
+        return result as String
+    }
+
+    private static func slug(fromHTML html: String) -> String {
+        let text = tagPattern
+            .stringByReplacingMatches(in: html, range: NSRange(html.startIndex..., in: html), withTemplate: "")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .lowercased()
+
+        return String(text.compactMap { character -> Character? in
+            if character == " " { return "-" }
+            if character == "-" || character == "_" { return character }
+            return character.isLetter || character.isNumber ? character : nil
+        })
     }
 }

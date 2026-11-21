@@ -69,7 +69,17 @@ final class ImageFetcher: NSObject, ImageFetcherProtocol {
             Self.openableSchemes.contains(scheme)
         else { return }
 
-        NSWorkspace.shared.open(url)
+        DispatchQueue.main.async {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func revealInFinder(_ path: String) {
+        guard path.hasPrefix("/") else { return }
+        // XPC messages arrive on a background queue; AppKit wants the main thread.
+        DispatchQueue.main.async {
+            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+        }
     }
 }
 

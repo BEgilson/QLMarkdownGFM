@@ -16,6 +16,15 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
     /// so Quick Look shows the finished preview instead of a blank view.
     private var pendingHandler: ((Error?) -> Void)?
 
+    /// The Markdown file currently shown. It changes when a link to another
+    /// Markdown file is clicked.
+    private var currentFile: URL?
+
+    /// A #heading to scroll to once the page has loaded, e.g. from `other.md#setup`.
+    private var pendingFragment: String?
+
+    private static let markdownExtensions: Set<String> = ["md", "markdown", "mdown", "mkd", "mkdn"]
+
     override func loadView() {
         let configuration = WKWebViewConfiguration()
         // Markdown files can contain raw HTML. Never run scripts that come from the file.
@@ -38,18 +47,26 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
         at url: URL,
         completionHandler handler: @escaping (Error?) -> Void
     ) {
+        pendingHandler = handler
         do {
-            let markdown = try String(contentsOf: url, encoding: .utf8)
-            let html = MarkdownHTML.page(for: markdown, title: url.lastPathComponent)
-            let folder = url.deletingLastPathComponent()
-
-            pendingHandler = handler
-            ImageEmbedder.embedImages(in: html, relativeTo: folder) { [weak self] html in
-                // The base URL lets relative links resolve against the file's folder.
-                self?.webView.loadHTMLString(html, baseURL: folder)
-            }
+            try show(url)
         } catch {
-            handler(error)
+            finishLoading(with: error)
+        }
+    }
+
+    /// Renders a Markdown file into the web view.
+    private func show(_ fileURL: URL, scrollingTo fragment: String? = nil) throws {
+        let markdown = try String(contentsOf: fileURL, encoding: .utf8)
+        let html = MarkdownHTML.page(for: markdown, title: fileURL.lastPathComponent)
+        let folder = fileURL.deletingLastPathComponent()
+
+        currentFile = fileURL
+        pendingFragment = fragment
+
+        ImageEmbedder.embedImages(in: html, relativeTo: folder) { [weak self] html in
+            // The base URL lets relative links resolve against the file's folder.
+            self?.webView.loadHTMLString(html, baseURL: folder)
         }
     }
 
@@ -57,6 +74,11 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         finishLoading(with: nil)
+
+        if let fragment = pendingFragment {
+            pendingFragment = nil
+            scroll(to: fragment)
+        }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -71,20 +93,86 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
         finishLoading(with: error)
     }
 
-    /// Open clicked links in the default browser instead of inside the preview.
+    /// Clicked links never navigate the web view itself: web links open in the
+    /// browser, and local links are handled by `openLocalLink(_:)`.
     func webView(
         _ webView: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        if navigationAction.navigationType == .linkActivated,
-           let url = navigationAction.request.url {
-            openLinkThroughHelper(url)
-            decisionHandler(.cancel)
-        } else {
+        guard navigationAction.navigationType == .linkActivated,
+              let url = navigationAction.request.url
+        else {
             decisionHandler(.allow)
+            return
+        }
+
+        decisionHandler(.cancel)
+        if url.isFileURL {
+            openLocalLink(url)
+        } else {
+            withHelper { $0.openLink(url.absoluteString) }
         }
     }
+
+    // MARK: - Local links
+
+    /// Relative links resolve against the Markdown file's folder, so they arrive as file: URLs.
+    ///  - `#setup` scrolls to that heading.
+    ///  - `other.md` (or `other.md#setup`) shows that Markdown file in the preview.
+    ///  - Anything else, e.g. `LICENSE`, is revealed in Finder. It's never opened,
+    ///    because a file could be an app or a script.
+    private func openLocalLink(_ url: URL) {
+        let target = url.standardizedFileURL
+        let fragment = url.fragment.flatMap { $0.removingPercentEncoding ?? $0 }
+
+        if let fragment, let currentFile,
+           target.path == currentFile.path || target.path == currentFile.deletingLastPathComponent().path {
+            scroll(to: fragment)
+            return
+        }
+
+        guard FileManager.default.fileExists(atPath: target.path) else { return }
+
+        if Self.markdownExtensions.contains(target.pathExtension.lowercased()) {
+            try? show(target, scrollingTo: fragment)
+        } else {
+            withHelper { $0.revealInFinder(target.path) }
+        }
+    }
+
+    /// Scrolls to the heading with this id. MarkdownHTML gives headings GitHub-style ids.
+    private func scroll(to id: String) {
+        // Runs in our isolated world; the id is passed as an argument, never spliced into code.
+        webView.callAsyncJavaScript(
+            "document.getElementById(id)?.scrollIntoView();",
+            arguments: ["id": id],
+            in: nil,
+            in: .defaultClient
+        )
+    }
+
+    // MARK: - Helper
+
+    /// Quick Look's sandbox blocks extensions from opening URLs or talking to Finder
+    /// (`deny lsopen`), so the ImageFetcher helper does it instead.
+    private func withHelper(_ body: (ImageFetcherProtocol) -> Void) {
+        let connection = NSXPCConnection(serviceName: ImageEmbedder.helperServiceName)
+        connection.remoteObjectInterface = NSXPCInterface(with: ImageFetcherProtocol.self)
+        connection.resume()
+
+        let helper = connection.remoteObjectProxyWithErrorHandler { error in
+            NSLog("MarkdownQuickLook: helper call failed: %@", String(describing: error))
+        } as? ImageFetcherProtocol
+        if let helper { body(helper) }
+
+        // These calls have no reply, so give the message a moment to be delivered.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            connection.invalidate()
+        }
+    }
+
+    // MARK: - Syntax highlighting
 
     /// highlight.js (bundled, BSD-3-Clause) plus a call that colours every code block
     /// that names its language, e.g. ```swift. Like GitHub, unlabelled blocks stay plain.
@@ -109,24 +197,6 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
             in: .defaultClient
         )
     }()
-
-    /// Quick Look's sandbox blocks extensions from opening URLs (`deny lsopen`),
-    /// so the ImageFetcher helper opens them instead.
-    private func openLinkThroughHelper(_ url: URL) {
-        let connection = NSXPCConnection(serviceName: ImageEmbedder.helperServiceName)
-        connection.remoteObjectInterface = NSXPCInterface(with: ImageFetcherProtocol.self)
-        connection.resume()
-
-        let helper = connection.remoteObjectProxyWithErrorHandler { error in
-            NSLog("MarkdownQuickLook: couldn't open link: %@", String(describing: error))
-        } as? ImageFetcherProtocol
-        helper?.openLink(url.absoluteString)
-
-        // openLink has no reply, so give the message a moment to be delivered.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            connection.invalidate()
-        }
-    }
 
     private func finishLoading(with error: Error?) {
         pendingHandler?(error)

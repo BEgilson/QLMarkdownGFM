@@ -6,6 +6,10 @@
 	<dict>
 		<key>ServiceType</key>
 		<string>Application</string>
+		<!-- Keep a main run loop. Revealing files in Finder (NSWorkspace) needs it;
+		     the default (dispatch_main) lets the main thread exit. -->
+		<key>RunLoopType</key>
+		<string>NSRunLoop</string>
 	</dict>
 </dict>
 </plist>
