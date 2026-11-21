@@ -20,8 +20,11 @@ This is a modern rewrite of [Watson1978/QLMarkdownGFM](https://github.com/Watson
 
 ## Requirements
 
-- macOS 12 Monterey or later. Development and testing have been done on macOS 27, so older versions are supported by the build settings but not yet tested.
+- macOS 12 Monterey or later
 - Xcode 27.2 or later, to build from source
+
+> [!WARNING]
+> QLMarkdownGFM has only been tested on macOS 27. It's built to run on macOS 12 and later, but versions 12 to 26 are untested. If you use one of them, please [open an issue](https://github.com/BEgilson/QLMarkdownGFM/issues) to say whether it works. Include your macOS version, what you tried, and a screenshot if something looks wrong.
 
 ## Installation
 
